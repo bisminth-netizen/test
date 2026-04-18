@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能体RAG · 智慧旅游 · 清迈</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Space+Mono:wght@400;700&family=Noto+Serif+Thai:wght@300;400;600&display=swap" rel="stylesheet">
+<!-- Leaflet for interactive map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --ink:#0a0a0a;
+  --paper:#f5f0e8;
+  --gold:#c8972a;
+  --gold2:#e8b84b;
+  --saffron:#e07b39;
+  --jade:#2d6a4f;
+  --jade2:#40916c;
+  --red:#c0392b;
+  --smoke:#ede8de;
+  --mist:#f9f6f0;
+  --very-high:#c0392b;
+  --high:#e07b39;
+  --medium:#c8972a;
+  --low:#2d6a4f;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Space Mono',monospace;
+  overflow-x:hidden;
+  cursor:none;
+}
+
+/* ── 自定义光标 ── */
+#cursor{position:fixed;width:12px;height:12px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;transition:transform .15s ease,opacity .2s;mix-blend-mode:multiply;}
+#cursor-ring{position:fixed;width:40px;height:40px;border:1.5px solid var(--gold);border-radius:50%;pointer-events:none;z-index:9998;transition:all .25s ease;mix-blend-mode:multiply;}
+
+/* ── 滚动区块 ── */
+section{
+  min-height:100vh;
+  scroll-snap-align:start;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+
+/* ══════════════════════════════════════════
+   第0区 — 首屏
+══════════════════════════════════════════ */
+#hero{
+  background:var(--ink);
+  flex-direction:column;
+  text-align:center;
+}
+.hero-noise{
+  position:absolute;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
+  pointer-events:none;opacity:.4;
+}
+.hero-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(200,151,42,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200,151,42,.07) 1px, transparent 1px);
+  background-size:60px 60px;
+  animation:gridDrift 20s linear infinite;
+}
+@keyframes gridDrift{from{background-position:0 0;}to{background-position:60px 60px;}}
+
+.hero-orb{
+  position:absolute;
+  border-radius:50%;
+  filter:blur(80px);
+  pointer-events:none;
+  animation:orbFloat 8s ease-in-out infinite;
+}
+.orb1{width:500px;height:500px;background:radial-gradient(circle,rgba(200,151,42,.22),transparent 70%);top:-100px;right:-100px;}
+.orb2{width:400px;height:400px;background:radial-gradient(circle,rgba(224,123,57,.18),transparent 70%);bottom:-80px;left:-80px;animation-delay:-4s;}
+@keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(20px,-20px) scale(1.05);}}
+
+.hero-inner{position:relative;z-index:2;padding:2rem;}
+.hero-eyebrow{
+  font-family:'Space Mono',monospace;
+  font-size:.65rem;letter-spacing:.35em;
+  color:var(--gold);text-transform:uppercase;
+  margin-bottom:2rem;
+  opacity:0;animation:fadeUp .8s .2s forwards;
+}
+.hero-title{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(3rem,8vw,7rem);
+  font-weight:900;
+  color:#f5f0e8;
+  line-height:.95;
+  margin-bottom:1.5rem;
+  opacity:0;animation:fadeUp .9s .4s forwards;
+}
+.hero-title em{
+  display:block;
+  font-style:italic;
+  color:var(--gold);
+  text-shadow:0 0 60px rgba(200,151,42,.4);
+}
+.hero-title span{
+  display:block;
+  font-size:clamp(1.2rem,3vw,2.4rem);
+  font-weight:400;
+  color:rgba(245,240,232,.5);
+  letter-spacing:.05em;
+  margin-top:.5rem;
+}
+.hero-sub{
+  font-family:'Space Mono',monospace;
+  font-size:.78rem;
+  color:rgba(245,240,232,.45);
+  letter-spacing:.1em;
+  margin-bottom:3rem;
+  opacity:0;animation:fadeUp .8s .6s forwards;
+}
+.hero-pills{
+  display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;
+  opacity:0;animation:fadeUp .8s .8s forwards;
+}
+.pill{
+  padding:.5rem 1.2rem;
+  border:1px solid rgba(200,151,42,.4);
+  border-radius:100px;
+  font-size:.65rem;
+  letter-spacing:.15em;
+  color:var(--gold2);
+  text-transform:uppercase;
+  backdrop-filter:blur(8px);
+}
+.hero-scroll{
+  position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:.5rem;
+  opacity:0;animation:fadeUp .8s 1.2s forwards;
+}
+.hero-scroll span{font-size:.58rem;letter-spacing:.3em;color:rgba(245,240,232,.3);text-transform:uppercase;}
+.scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,var(--gold),transparent);animation:scrollPulse 2s ease-in-out infinite;}
+@keyframes scrollPulse{0%,100%{opacity:.3;transform:scaleY(.8);}50%{opacity:1;transform:scaleY(1);}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+
+/* ══════════════════════════════════════════
+   第1区 — 问题
+══════════════════════════════════════════ */
+#problem{
+  background:var(--mist);
+  flex-direction:column;
+  padding:4rem 2rem;
+}
+.section-label{
+  font-family:'Space Mono',monospace;
+  font-size:.6rem;letter-spacing:.4em;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin-bottom:1.2rem;
+}
+.problem-layout{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4rem;
+  max-width:1100px;
+  width:100%;
+  align-items:center;
+}
+@media(max-width:768px){.problem-layout{grid-template-columns:1fr;gap:2rem;}}
+.problem-text h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2rem,4vw,3.5rem);
+  font-weight:900;
+  line-height:1.1;
+  margin-bottom:1.5rem;
+  color:var(--ink);
+}
+.problem-text h2 em{font-style:italic;color:var(--saffron);}
+.problem-text p{
+  font-size:.82rem;line-height:1.9;
+  color:#444;margin-bottom:1rem;
+}
+.stat-stack{display:flex;flex-direction:column;gap:1.2rem;}
+.stat-card{
+  background:white;
+  border-radius:16px;
+  padding:1.5rem 2rem;
+  border-left:4px solid;
+  box-shadow:0 4px 24px rgba(0,0,0,.06);
+  transition:transform .3s ease,box-shadow .3s ease;
+  cursor:default;
+}
+.stat-card:hover{transform:translateX(8px);box-shadow:0 8px 40px rgba(0,0,0,.12);}
+.stat-card.very-high{border-color:var(--very-high);}
+.stat-card.high{border-color:var(--high);}
+.stat-card.medium{border-color:var(--medium);}
+.stat-card.low{border-color:var(--jade);}
+.stat-card .num{
+  font-size:2.5rem;font-weight:700;
+  font-family:'Playfair Display',serif;
+  line-height:1;
+}
+.stat-card.very-high .num{color:var(--very-high);}
+.stat-card.high .num{color:var(--high);}
+.stat-card.medium .num{color:var(--medium);}
+.stat-card.low .num{color:var(--jade);}
+.stat-card .label{font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:#888;margin-top:.3rem;}
+.stat-card .desc{font-size:.75rem;color:#555;margin-top:.5rem;line-height:1.6;}
+
+/* ══════════════════════════════════════════
+   第2区 — 系统流程
+══════════════════════════════════════════ */
+#pipeline{
+  background:var(--ink);
+  flex-direction:column;
+  padding:4rem 2rem;
+}
+#pipeline .section-label{color:var(--gold);}
+#pipeline h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2rem,4vw,3rem);
+  color:#f5f0e8;
+  font-weight:900;
+  text-align:center;
+  margin-bottom:.5rem;
+}
+#pipeline .sub{
+  text-align:center;font-size:.75rem;
+  color:rgba(245,240,232,.4);letter-spacing:.08em;
+  margin-bottom:3rem;
+}
+.pipeline-flow{
+  display:flex;
+  align-items:stretch;
+  gap:0;
+  max-width:1100px;
+  width:100%;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+.pipe-step{
+  flex:1;min-width:160px;max-width:220px;
+  position:relative;
+  padding:2rem 1.5rem 2rem;
+  text-align:center;
+  cursor:pointer;
+  transition:transform .3s ease;
+}
+.pipe-step:hover{transform:translateY(-8px);}
+.pipe-step::after{
+  content:'→';
+  position:absolute;right:-12px;top:50%;transform:translateY(-50%);
+  color:var(--gold);font-size:1.2rem;
+  z-index:2;
+}
+.pipe-step:last-child::after{display:none;}
+.pipe-icon{
+  width:64px;height:64px;
+  background:rgba(200,151,42,.12);
+  border:1.5px solid rgba(200,151,42,.3);
+  border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.8rem;margin:0 auto 1rem;
+  transition:all .3s ease;
+  color:var(--gold);
+}
+.pipe-icon svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+.pipe-step:hover .pipe-icon{
+  background:rgba(200,151,42,.25);
+  border-color:var(--gold);
+  box-shadow:0 0 30px rgba(200,151,42,.3);
+}
+.icon{display:inline-flex;align-items:center;vertical-align:middle;line-height:1;}
+.icon svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.pipe-step h3{
+  font-family:'Playfair Display',serif;
+  font-size:1rem;color:#f5f0e8;
+  margin-bottom:.5rem;font-style:italic;
+}
+.pipe-step p{font-size:.65rem;color:rgba(245,240,232,.45);line-height:1.7;}
+.pipe-tag{
+  display:inline-block;
+  margin-top:.8rem;
+  padding:.25rem .7rem;
+  border-radius:100px;
+  font-size:.55rem;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  background:rgba(200,151,42,.15);
+  color:var(--gold2);
+  border:1px solid rgba(200,151,42,.2);
+}
+.pipe-step.active-step .pipe-icon{
+  background:var(--gold);
+  border-color:var(--gold);
+  animation:pipePulse 2s ease-in-out infinite;
+  color:white;
+}
+@keyframes pipePulse{0%,100%{box-shadow:0 0 0 0 rgba(200,151,42,.4);}50%{box-shadow:0 0 0 16px rgba(200,151,42,0);}}
+
+/* ══════════════════════════════════════════
+   第3区 — POI 热力密度
+══════════════════════════════════════════ */
+#density{
+  background:var(--smoke);
+  flex-direction:column;
+  padding:4rem 2rem;
+}
+#density h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2rem,4vw,3rem);
+  font-weight:900;
+  text-align:center;
+  margin-bottom:.5rem;
+}
+#density h2 em{font-style:italic;color:var(--saffron);}
+#density .sub{
+  text-align:center;font-size:.75rem;
+  color:#888;letter-spacing:.08em;margin-bottom:2.5rem;
+}
+.filter-row{
+  display:flex;gap:.6rem;flex-wrap:wrap;
+  justify-content:center;margin-bottom:2rem;
+}
+.filter-btn{
+  padding:.4rem 1rem;
+  border-radius:100px;
+  border:1.5px solid;
+  font-size:.62rem;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:all .25s ease;
+  font-family:'Space Mono',monospace;
+  background:transparent;
+}
+.filter-btn.all{border-color:var(--ink);color:var(--ink);}
+.filter-btn.all.active,.filter-btn.all:hover{background:var(--ink);color:white;}
+.filter-btn.very_high{border-color:var(--very-high);color:var(--very-high);}
+.filter-btn.very_high.active,.filter-btn.very_high:hover{background:var(--very-high);color:white;}
+.filter-btn.high{border-color:var(--high);color:var(--high);}
+.filter-btn.high.active,.filter-btn.high:hover{background:var(--high);color:white;}
+.filter-btn.medium{border-color:var(--medium);color:var(--medium);}
+.filter-btn.medium.active,.filter-btn.medium:hover{background:var(--medium);color:white;}
+.filter-btn.low{border-color:var(--jade);color:var(--jade);}
+.filter-btn.low.active,.filter-btn.low:hover{background:var(--jade);color:white;}
+
+.poi-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:1rem;
+  max-width:1100px;
+  width:100%;
+  max-height:520px;
+  overflow-y:auto;
+  padding-right:.5rem;
+}
+.poi-grid::-webkit-scrollbar{width:4px;}
+.poi-grid::-webkit-scrollbar-track{background:transparent;}
+.poi-grid::-webkit-scrollbar-thumb{background:var(--gold);border-radius:2px;}
+
+.poi-card{
+  background:white;
+  border-radius:16px;
+  padding:1.4rem;
+  cursor:pointer;
+  transition:all .3s ease;
+  border:1.5px solid transparent;
+  position:relative;
+  overflow:hidden;
+}
+.poi-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+}
+.poi-card.very_high::before{background:var(--very-high);}
+.poi-card.high::before{background:var(--high);}
+.poi-card.medium::before{background:var(--medium);}
+.poi-card.low::before{background:var(--jade);}
+.poi-card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 16px 48px rgba(0,0,0,.12);
+  border-color:rgba(200,151,42,.3);
+}
+.poi-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.8rem;}
+.poi-name{
+  font-family:'Playfair Display',serif;
+  font-size:1rem;font-weight:700;
+  line-height:1.2;flex:1;
+}
+.risk-badge{
+  padding:.2rem .6rem;
+  border-radius:100px;
+  font-size:.55rem;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  font-weight:700;
+  white-space:nowrap;
+  margin-left:.5rem;
+}
+.risk-badge.very_high{background:#fde8e6;color:var(--very-high);}
+.risk-badge.high{background:#fdf0e6;color:var(--high);}
+.risk-badge.medium{background:#fdf8e6;color:#a07820;}
+.risk-badge.low{background:#e8f5ee;color:var(--jade);}
+.poi-category{font-size:.6rem;color:#999;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.8rem;}
+.density-bar-wrap{margin-bottom:.6rem;}
+.density-label{display:flex;justify-content:space-between;font-size:.62rem;margin-bottom:.3rem;}
+.density-label span:first-child{color:#666;}
+.density-label span:last-child{font-weight:700;}
+.density-bar{height:6px;background:#eee;border-radius:3px;overflow:hidden;}
+.density-fill{height:100%;border-radius:3px;transition:width 1s ease;position:relative;}
+.density-fill::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:30%;
+  background:linear-gradient(to right,transparent,rgba(255,255,255,.4));
+}
+.poi-card.very_high .density-fill{background:linear-gradient(90deg,var(--very-high),#e74c3c);}
+.poi-card.high .density-fill{background:linear-gradient(90deg,var(--high),var(--saffron));}
+.poi-card.medium .density-fill{background:linear-gradient(90deg,var(--medium),var(--gold2));}
+.poi-card.low .density-fill{background:linear-gradient(90deg,var(--jade),var(--jade2));}
+.poi-meta{display:flex;gap:.8rem;font-size:.62rem;color:#888;}
+.poi-meta span{display:flex;align-items:center;gap:.3rem;}
+
+/* ══════════════════════════════════════════
+   第3.5区 — 交互地图（新增）
+══════════════════════════════════════════ */
+#map-section{
+  background:var(--paper);
+  flex-direction:column;
+  padding:4rem 2rem;
+}
+#map-section h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2rem,4vw,3rem);
+  font-weight:900;
+  text-align:center;
+  margin-bottom:.5rem;
+}
+#map-section h2 em{font-style:italic;color:var(--saffron);}
+#map-section .sub{
+  text-align:center;font-size:.75rem;
+  color:#888;letter-spacing:.08em;margin-bottom:2.5rem;
+}
+.map-layout{
+  display:grid;
+  grid-template-columns:1fr 340px;
+  gap:2rem;
+  max-width:1200px;
+  width:100%;
+  align-items:start;
+}
+@media(max-width:900px){
+  .map-layout{grid-template-columns:1fr;}
+}
+#poi-map{
+  width:100%;
+  height:500px;
+  border-radius:24px;
+  box-shadow:0 20px 40px rgba(0,0,0,.1);
+  border:1px solid rgba(200,151,42,.2);
+  overflow:hidden;
+  z-index:1;
+}
+.map-sidebar{
+  display:flex;
+  flex-direction:column;
+  gap:1rem;
+}
+.map-legend{
+  background:white;
+  border-radius:20px;
+  padding:1.5rem;
+  box-shadow:0 4px 20px rgba(0,0,0,.06);
+}
+.map-legend-title{
+  font-size:.7rem;
+  font-weight:700;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin-bottom:1rem;
+}
+.legend-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:.75rem;
+  color:#555;
+  margin-bottom:10px;
+}
+.legend-dot-circle{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+.map-poi-list{
+  background:white;
+  border-radius:20px;
+  box-shadow:0 4px 20px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+.map-poi-list-header{
+  padding:1rem 1.2rem;
+  background:var(--gold);
+  color:white;
+  font-size:.7rem;
+  font-weight:700;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.map-poi-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 16px;
+  border-bottom:1px solid #eee;
+  cursor:pointer;
+  transition:all .2s ease;
+}
+.map-poi-row:hover{
+  background:rgba(200,151,42,.08);
+}
+.map-poi-row:last-child{border-bottom:none;}
+.poi-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+.poi-name-th{
+  font-size:.8rem;
+  font-weight:700;
+  color:var(--ink);
+}
+.poi-name-en{
+  font-size:.65rem;
+  color:#999;
+}
+.poi-density{
+  font-size:.8rem;
+  font-weight:800;
+  color:var(--gold);
+  margin-left:auto;
+}
+.map-time-badge{
+  background:white;
+  border-radius:20px;
+  padding:1rem 1.2rem;
+  box-shadow:0 4px 20px rgba(0,0,0,.06);
+  font-size:.7rem;
+  color:#666;
+  line-height:1.6;
+}
+.map-time-badge strong{color:var(--saffron);}
+.poi-preview-section{
+  margin-top:2rem;
+  border-top:1px solid rgba(0,0,0,.08);
+  padding-top:1.5rem;
+  display:none;
+}
+.poi-preview-section.active{display:block;}
+.poi-preview-eyebrow{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:.6rem;
+  font-weight:700;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin-bottom:.5rem;
+}
+.poi-preview-eyebrow::before{
+  content:'';
+  width:16px;
+  height:2px;
+  background:var(--gold);
+  border-radius:2px;
+}
+.poi-preview-title{
+  font-size:1rem;
+  font-weight:800;
+  color:var(--ink);
+}
+.poi-preview-title-en{
+  font-size:.7rem;
+  color:#888;
+  margin-bottom:.8rem;
+}
+.poi-preview-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+.poi-preview-img-wrap{
+  border-radius:16px;
+  overflow:hidden;
+  aspect-ratio:16/10;
+  background:#ddd;
+  box-shadow:0 4px 12px rgba(0,0,0,.08);
+  transition:transform .3s ease;
+}
+.poi-preview-img-wrap:hover{transform:translateY(-4px);}
+.poi-preview-img-wrap img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.poi-preview-img-label{
+  display:none;
+}
+@media(max-width:600px){
+  .poi-preview-grid{grid-template-columns:1fr;}
+}
+.leaflet-popup-content-wrapper{
+  border-radius:16px !important;
+  box-shadow:0 8px 32px rgba(0,0,0,.15) !important;
+}
+.leaflet-popup-tip{display:none;}
+.poi-popup{padding:12px 16px;min-width:200px;}
+.poi-popup-name{font-size:.9rem;font-weight:800;color:var(--ink);margin-bottom:2px;}
+.poi-popup-en{font-size:.7rem;color:#888;margin-bottom:10px;}
+.poi-popup-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.poi-popup-stat{background:#f5f0e8;border-radius:12px;padding:8px 10px;text-align:center;}
+.poi-popup-val{font-size:1rem;font-weight:800;color:var(--ink);}
+.poi-popup-lbl{font-size:.6rem;color:#888;text-transform:uppercase;letter-spacing:.05em;}
+
+/* ══════════════════════════════════════════
+   第4区 — 情感分析 & RAG 结果
+══════════════════════════════════════════ */
+#sentiment{
+  background:var(--ink);
+  flex-direction:column;
+  padding:4rem 2rem;
+}
+#sentiment .section-label{color:var(--gold);}
+#sentiment h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2rem,4vw,3rem);
+  color:#f5f0e8;font-weight:900;
+  text-align:center;margin-bottom:.5rem;
+}
+#sentiment .sub{
+  text-align:center;font-size:.75rem;
+  color:rgba(245,240,232,.4);letter-spacing:.08em;
+  margin-bottom:3rem;
+}
+.sent-layout{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:3rem;
+  max-width:1100px;
+  width:100%;
+}
+@media(max-width:768px){.sent-layout{grid-template-columns:1fr;}}
+.sent-left h3{
+  font-family:'Playfair Display',serif;
+  color:#f5f0e8;font-style:italic;
+  font-size:1.3rem;margin-bottom:1.5rem;
+}
+.donut-wrap{
+  position:relative;width:220px;height:220px;margin:0 auto 1.5rem;
+}
+.donut-wrap svg{width:100%;height:100%;}
+.donut-center{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  text-align:center;
+}
+.donut-num{
+  font-family:'Playfair Display',serif;
+  font-size:2.5rem;font-weight:900;
+  color:var(--jade2);line-height:1;
+}
+.donut-lbl{font-size:.6rem;color:rgba(245,240,232,.4);letter-spacing:.15em;text-transform:uppercase;}
+.legend-row{display:flex;align-items:center;gap:.8rem;margin-bottom:.7rem;}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.legend-text{font-size:.72rem;color:rgba(245,240,232,.7);flex:1;}
+.legend-pct{font-size:.72rem;font-weight:700;color:#f5f0e8;}
+
+.sent-right h3{
+  font-family:'Playfair Display',serif;
+  color:#f5f0e8;font-style:italic;
+  font-size:1.3rem;margin-bottom:1.5rem;
+}
+.poi-sentiment-list{display:flex;flex-direction:column;gap:.8rem;}
+.poi-sent-item{
+  background:rgba(255,255,255,.05);
+  border-radius:12px;
+  padding:1rem 1.2rem;
+  border:1px solid rgba(255,255,255,.06);
+  transition:all .3s ease;cursor:default;
+}
+.poi-sent-item:hover{background:rgba(255,255,255,.09);border-color:rgba(200,151,42,.3);}
+.poi-sent-name{
+  font-size:.8rem;color:#f5f0e8;
+  font-weight:700;margin-bottom:.6rem;
+}
+.mini-bars{display:flex;gap:.3rem;height:8px;border-radius:4px;overflow:hidden;}
+.mini-bar-pos{background:var(--jade2);}
+.mini-bar-neu{background:var(--gold);}
+.mini-bar-neg{background:var(--red);}
+.mini-pcts{display:flex;gap:1rem;margin-top:.4rem;font-size:.6rem;}
+.pct-pos{color:var(--jade2);}
+.pct-neu{color:var(--gold2);}
+.pct-neg{color:#e74c3c;}
+
+/* ══════════════════════════════════════════
+   第5区 — 评估指标
+══════════════════════════════════════════ */
+#metrics{
+  background:var(--paper);
+  flex-direction:column;
+  padding:4rem 2rem;
+}
+#metrics h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2rem,4vw,3rem);
+  font-weight:900;text-align:center;margin-bottom:.5rem;
+}
+#metrics h2 em{font-style:italic;color:var(--jade);}
+#metrics .sub{
+  text-align:center;font-size:.75rem;
+  color:#888;letter-spacing:.08em;margin-bottom:3rem;
+}
+.metrics-layout{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:3rem;
+  max-width:1100px;width:100%;
+}
+@media(max-width:768px){.metrics-layout{grid-template-columns:1fr;}}
+.metric-panel{background:white;border-radius:20px;padding:2rem;box-shadow:0 4px 24px rgba(0,0,0,.06);}
+.metric-panel h3{
+  font-family:'Playfair Display',serif;
+  font-size:1.2rem;font-style:italic;
+  margin-bottom:1.5rem;color:var(--ink);
+}
+.hit-rates{display:flex;flex-direction:column;gap:1rem;}
+.hit-row{display:flex;align-items:center;gap:1rem;}
+.hit-k{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:#888;width:60px;flex-shrink:0;}
+.hit-bar-wrap{flex:1;height:10px;background:#eee;border-radius:5px;overflow:hidden;}
+.hit-bar{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--jade),var(--jade2));transition:width 1.2s ease;}
+.hit-val{font-size:.8rem;font-weight:700;color:var(--jade);width:40px;text-align:right;}
+.hit-target{
+  margin-top:1.2rem;
+  padding:.8rem 1rem;
+  background:#e8f5ee;
+  border-radius:10px;
+  font-size:.7rem;
+  color:var(--jade);
+  display:flex;align-items:center;gap:.5rem;
+}
+.token-compare{display:flex;gap:1.5rem;}
+.token-col{flex:1;text-align:center;}
+.token-col-label{font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:#999;margin-bottom:.8rem;}
+.token-bubble{
+  width:100px;height:100px;
+  border-radius:50%;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  margin:0 auto 1rem;
+  font-family:'Playfair Display',serif;
+  transition:transform .3s ease;
+  cursor:default;
+}
+.token-bubble:hover{transform:scale(1.08);}
+.token-bubble.plain{background:#f0f0f0;border:2px dashed #ccc;}
+.token-bubble.agentic{background:linear-gradient(135deg,rgba(200,151,42,.15),rgba(200,151,42,.05));border:2px solid var(--gold);}
+.token-bubble .tnum{font-size:1.5rem;font-weight:900;line-height:1;}
+.token-bubble .tlbl{font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:#888;}
+.token-detail{font-size:.65rem;color:#666;line-height:1.8;}
+.token-win{
+  margin-top:1rem;padding:.6rem .8rem;
+  background:linear-gradient(135deg,rgba(200,151,42,.1),rgba(200,151,42,.05));
+  border-radius:8px;font-size:.68rem;color:var(--gold);
+  border:1px solid rgba(200,151,42,.2);
+  text-align:center;
+}
+
+/* ══════════════════════════════════════════
+   第6区 — 现场演示模拟
+══════════════════════════════════════════ */
+#demo{
+  background:var(--smoke);
+  flex-direction:column;
+  padding:4rem 2rem;
+}
+#demo h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2rem,4vw,3rem);
+  font-weight:900;text-align:center;margin-bottom:.5rem;
+}
+#demo h2 em{font-style:italic;color:var(--saffron);}
+#demo .sub{
+  text-align:center;font-size:.75rem;
+  color:#888;letter-spacing:.08em;margin-bottom:2.5rem;
+}
+.chat-demo{
+  max-width:700px;width:100%;
+  background:white;
+  border-radius:24px;
+  box-shadow:0 24px 80px rgba(0,0,0,.12);
+  overflow:hidden;
+}
+.chat-topbar{
+  background:var(--ink);
+  padding:1rem 1.5rem;
+  display:flex;align-items:center;gap:.8rem;
+}
+.chat-dots{display:flex;gap:.4rem;}
+.dot{width:10px;height:10px;border-radius:50%;}
+.dot.r{background:#ff5f57;}.dot.y{background:#febc2e;}.dot.g{background:#28c840;}
+.chat-title{font-size:.7rem;color:rgba(245,240,232,.5);letter-spacing:.15em;text-transform:uppercase;margin:0 auto;}
+.chat-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem;min-height:360px;}
+.msg{max-width:80%;padding:1rem 1.2rem;border-radius:16px;font-size:.78rem;line-height:1.7;}
+.msg.user{
+  align-self:flex-end;
+  background:linear-gradient(135deg,var(--saffron),var(--gold));
+  color:white;
+  border-radius:16px 16px 4px 16px;
+}
+.msg.bot{
+  align-self:flex-start;
+  background:#f5f0e8;
+  color:var(--ink);
+  border-radius:16px 16px 16px 4px;
+  position:relative;
+}
+.msg.bot::before{
+  content:'◆';position:absolute;top:-20px;left:0;
+  font-size:.7rem;color:var(--gold);
+}
+.tool-call{
+  align-self:flex-start;
+  background:rgba(200,151,42,.08);
+  border:1px solid rgba(200,151,42,.2);
+  border-radius:10px;
+  padding:.6rem 1rem;
+  font-size:.65rem;
+  color:var(--gold);
+  font-family:'Space Mono',monospace;
+  display:flex;align-items:center;gap:.5rem;
+}
+.tool-call .tool-icon{display:inline-flex;align-items:center;flex-shrink:0;}
+.tool-call .tool-icon svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.typing{
+  display:flex;gap:.3rem;align-items:center;padding:.8rem 1rem;
+  background:#f5f0e8;border-radius:16px 16px 16px 4px;
+  align-self:flex-start;
+}
+.typing span{
+  width:6px;height:6px;background:#aaa;border-radius:50%;
+  animation:typeBounce .9s ease-in-out infinite;
+}
+.typing span:nth-child(2){animation-delay:.15s;}
+.typing span:nth-child(3){animation-delay:.3s;}
+@keyframes typeBounce{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-6px);}}
+.chat-input-row{
+  display:flex;gap:.8rem;padding:1rem 1.5rem;
+  border-top:1px solid #eee;
+}
+.chat-queries{display:flex;flex-wrap:wrap;gap:.5rem;max-width:700px;width:100%;justify-content:center;}
+.query-chip{
+  padding:.5rem 1rem;
+  border:1.5px solid var(--gold);
+  border-radius:100px;
+  font-size:.65rem;
+  color:var(--gold);
+  cursor:pointer;
+  transition:all .25s ease;
+  font-family:'Space Mono',monospace;
+  background:transparent;
+}
+.query-chip:hover,.query-chip.selected{background:var(--gold);color:white;}
+
+/* ══════════════════════════════════════════
+   第7区 — 结语
+══════════════════════════════════════════ */
+#closing{
+  background:var(--ink);
+  flex-direction:column;
+  text-align:center;
+  padding:4rem 2rem;
+}
+.closing-inner{position:relative;z-index:2;}
+.closing-inner .section-label{color:var(--gold);}
+.closing-inner h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2.5rem,6vw,5rem);
+  font-weight:900;
+  color:#f5f0e8;
+  line-height:1.0;
+  margin-bottom:1.5rem;
+}
+.closing-inner h2 em{font-style:italic;color:var(--gold);}
+.rq-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:1.2rem;
+  max-width:900px;
+  margin:2rem auto 2.5rem;
+}
+@media(max-width:600px){.rq-grid{grid-template-columns:1fr;}}
+.rq-card{
+  padding:1.5rem;
+  background:rgba(255,255,255,.04);
+  border-radius:16px;
+  border:1px solid rgba(200,151,42,.2);
+  text-align:left;
+  transition:all .3s ease;cursor:default;
+}
+.rq-card:hover{background:rgba(200,151,42,.08);border-color:rgba(200,151,42,.5);transform:translateY(-4px);}
+.rq-num{
+  font-size:.55rem;letter-spacing:.25em;
+  text-transform:uppercase;color:var(--gold);margin-bottom:.6rem;
+}
+.rq-q{font-size:.78rem;color:#f5f0e8;line-height:1.6;font-style:italic;}
+.rq-a{font-size:.7rem;color:rgba(245,240,232,.5);margin-top:.5rem;line-height:1.6;}
+.team-credits{
+  display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;
+  margin-top:2rem;
+}
+.team-credit{
+  padding:.5rem 1.2rem;
+  background:rgba(255,255,255,.05);
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,.08);
+  font-size:.65rem;color:rgba(245,240,232,.5);
+  letter-spacing:.1em;
+}
+.course-note{font-size:.6rem;color:rgba(245,240,232,.25);letter-spacing:.15em;margin-top:1.5rem;}
+
+/* ── 交叉观察器渐现 ── */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .8s ease,transform .8s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.reveal-delay-1{transition-delay:.15s;}
+.reveal-delay-2{transition-delay:.3s;}
+.reveal-delay-3{transition-delay:.45s;}
+.reveal-delay-4{transition-delay:.6s;}
+
+/* ── 导航圆点 ── */
+#nav-dots{
+  position:fixed;right:2rem;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:.6rem;z-index:100;
+}
+.nav-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:rgba(0,0,0,.2);
+  cursor:pointer;
+  transition:all .3s ease;
+}
+.nav-dot.active{background:var(--gold);transform:scale(1.4);}
+#hero~* .nav-dot{background:rgba(255,255,255,.2);}
+</style>
+</head>
+<body>
+
+<!-- 自定义光标 -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- 导航圆点 -->
+<nav id="nav-dots">
+  <div class="nav-dot active" data-target="hero" title="首屏"></div>
+  <div class="nav-dot" data-target="problem" title="问题"></div>
+  <div class="nav-dot" data-target="pipeline" title="流程"></div>
+  <div class="nav-dot" data-target="density" title="POI 密度"></div>
+  <div class="nav-dot" data-target="map-section" title="地图"></div>
+  <div class="nav-dot" data-target="sentiment" title="情感分析"></div>
+  <div class="nav-dot" data-target="metrics" title="指标"></div>
+  <div class="nav-dot" data-target="demo" title="演示"></div>
+  <div class="nav-dot" data-target="closing" title="结论"></div>
+</nav>
+
+<!-- ══ 首屏 ══════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-noise"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-orb orb1"></div>
+  <div class="hero-orb orb2"></div>
+  <div class="hero-inner">
+    <p class="hero-eyebrow">人工智能与大型模型 期末项目</p>
+    <h1 class="hero-title">
+      <em>智能体 RAG</em>
+      赋能智慧旅游
+      <span>泰国 · 清迈</span>
+    </h1>
+    <p class="hero-sub">陈文华 (Boonyoros Pheechaphuth) · LS2525207 &nbsp;|&nbsp; 李彬 (Teh Bismin) · LS2525222</p>
+    <div class="hero-pills">
+      <div class="pill">YouTube 情感分析</div>
+      <div class="pill">GNSS 轨迹 · DBSCAN</div>
+      <div class="pill">FAISS 向量检索</div>
+      <div class="pill">Groq LLaMA 3.1 · ReAct</div>
+    </div>
+  </div>
+  <div class="hero-scroll">
+    <span>向下滚动探索</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- ══ 问题区 ════════════════════════════════════ -->
+<section id="problem">
+  <div class="problem-layout">
+    <div class="problem-text reveal">
+      <p class="section-label">01 · 痛点聚焦</p>
+      <h2>过度旅游正<em>悄然侵蚀</em>清迈的文化遗产</h2>
+      <p>清迈每年接待数百万游客，但一直没有智能系统能够综合人群数据、游客情感和空间情报，提供可执行的导览建议。</p>
+      <p>我们构建了<strong>智能体 RAG 系统</strong>，融合 GNSS 轨迹分析、YouTube 情感挖掘和大模型推理，用真实空间上下文回答过度旅游相关问题。</p>
+    </div>
+    <div class="stat-stack">
+      <div class="stat-card very-high reveal reveal-delay-1">
+        <div class="num">0.92</div>
+        <div class="label">最高 GPS 密度 — 周日夜市步行街</div>
+        <div class="desc">420 条模拟 GPS 轨迹 · 平均停留 90 分钟 · 极高过度旅游风险</div>
+      </div>
+      <div class="stat-card high reveal reveal-delay-2">
+        <div class="num">4 / 24</div>
+        <div class="label">高风险 / 极高风险 POI 数量</div>
+        <div class="desc">素贴山双龙寺、周日夜市、长康路夜市、帕辛寺</div>
+      </div>
+      <div class="stat-card medium reveal reveal-delay-3">
+        <div class="num">78.9%</div>
+        <div class="label">Hit Rate @5 — RAG 检索质量</div>
+        <div class="desc">在 38 个查询评估集上超越 75% 目标 · FAISS 余弦相似度</div>
+      </div>
+      <div class="stat-card low reveal reveal-delay-4">
+        <div class="num">$0.00</div>
+        <div class="label">项目总成本</div>
+        <div class="desc">全免费技术栈：YouTube API · Groq · HuggingFace 本地模型 · FAISS</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 系统流程 ═══════════════════════════════════ -->
+<section id="pipeline">
+  <div style="width:100%;max-width:1100px;">
+    <p class="section-label" style="text-align:center;">02 · 系统架构</p>
+    <h2>四步智能流水线</h2>
+    <p class="sub">从原始数据到智能体答案 —— 全组件开源且免费</p>
+    <div class="pipeline-flow">
+      <div class="pipe-step reveal" onclick="highlightPipe(this)">
+        <div class="pipe-icon"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+        <h3>步骤 1</h3>
+        <p>YouTube Data API · 8 个 POI 查询 · 英文 + 地点相关性过滤 · cardiffnlp XLM-RoBERTa 情感模型</p>
+        <div class="pipe-tag">sentiment_data.csv</div>
+      </div>
+      <div class="pipe-step reveal reveal-delay-1" onclick="highlightPipe(this)">
+        <div class="pipe-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></div>
+        <h3>步骤 2</h3>
+        <p>OSM GPS 轨迹点 · 相关随机游走模拟 · DBSCAN ε=0.002° · 速度过滤 150 km/h</p>
+        <div class="pipe-tag">hotspots.geojson</div>
+      </div>
+      <div class="pipe-step reveal reveal-delay-2" onclick="highlightPipe(this)">
+        <div class="pipe-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div>
+        <h3>步骤 3</h3>
+        <p>Sentence Transformer 384 维 · FAISS IndexFlatIP 余弦 · 38 查询评估 · Hit Rate @5 = 78.9%</p>
+        <div class="pipe-tag">faiss.index</div>
+      </div>
+      <div class="pipe-step reveal reveal-delay-3 active-step" onclick="highlightPipe(this)">
+        <div class="pipe-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <h3>应用</h3>
+        <p>Groq LLaMA 3.1 8B · ReAct 智能体循环 · 4 个工具：get_hotspot, get_sentiment, search_poi, rag_retrieve</p>
+        <div class="pipe-tag">streamlit run app.py</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 密度区 ════════════════════════════════════ -->
+<section id="density">
+  <div style="width:100%;max-width:1100px;">
+    <p class="section-label" style="text-align:center;">03 · GPS 密度分析</p>
+    <h2>24 个 POI 的<em>人群密度</em>排名</h2>
+    <p class="sub">基于 DBSCAN 的密度分数 · 数据源自 config_pois.json + step2_gps.py 模拟</p>
+    <div class="filter-row">
+      <button class="filter-btn all active" onclick="filterPOIs('all',this)">全部 POI</button>
+      <button class="filter-btn very_high" onclick="filterPOIs('very_high',this)">极高风险</button>
+      <button class="filter-btn high" onclick="filterPOIs('high',this)">高风险</button>
+      <button class="filter-btn medium" onclick="filterPOIs('medium',this)">中风险</button>
+      <button class="filter-btn low" onclick="filterPOIs('low',this)">低风险</button>
+    </div>
+    <div class="poi-grid" id="poiGrid"></div>
+  </div>
+</section>
+
+<!-- ══ 交互地图区（新增）══════════════════════════ -->
+<section id="map-section">
+  <div style="width:100%;max-width:1200px;">
+    <p class="section-label" style="text-align:center;">03.5 · 空间智能</p>
+    <h2>GPS 热点<span style="font-style:italic;color:var(--saffron);"> 交互地图</span></h2>
+    <p class="sub">基于 Leaflet 的可视化地图 · 点击标记查看详细统计</p>
+    
+    <div class="map-layout">
+      <!-- Leaflet 地图容器 -->
+      <div id="poi-map"></div>
+
+      <!-- 右侧边栏：图例 + POI 列表 + 提示 -->
+      <div class="map-sidebar">
+        <!-- 图例卡片 -->
+        <div class="map-legend reveal">
+          <div class="map-legend-title">密度等级</div>
+          <div class="legend-row">
+            <div class="legend-dot-circle" style="background:#e03939;"></div>
+            <span>高风险 (&gt;80%) — 极高密度</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot-circle" style="background:#c8972a;"></div>
+            <span>中风险 (60–80%) — 中等密度</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-dot-circle" style="background:#2d6a4f;"></div>
+            <span>低风险 (&lt;60%) — 低密度</span>
+          </div>
+        </div>
+
+        <!-- 热门 POI 快捷列表 -->
+        <div class="map-poi-list reveal reveal-delay-1">
+          <div class="map-poi-list-header">按密度排序 TOP 8</div>
+          <div class="map-poi-row" data-poi-idx="0">
+            <div class="poi-dot" style="background:#e03939;"></div>
+            <div><div class="poi-name-th">周日夜市步行街</div><div class="poi-name-en">Sunday Walking Street</div></div>
+            <div class="poi-density">92%</div>
+          </div>
+          <div class="map-poi-row" data-poi-idx="1">
+            <div class="poi-dot" style="background:#e03939;"></div>
+            <div><div class="poi-name-th">素贴山双龙寺</div><div class="poi-name-en">Wat Doi Suthep</div></div>
+            <div class="poi-density">88%</div>
+          </div>
+          <div class="map-poi-row" data-poi-idx="2">
+            <div class="poi-dot" style="background:#e03939;"></div>
+            <div><div class="poi-name-th">帕辛寺</div><div class="poi-name-en">Wat Phra Singh</div></div>
+            <div class="poi-density">85%</div>
+          </div>
+          <div class="map-poi-row" data-poi-idx="3">
+            <div class="poi-dot" style="background:#e03939;"></div>
+            <div><div class="poi-name-th">契迪龙寺</div><div class="poi-name-en">Wat Chedi Luang</div></div>
+            <div class="poi-density">80%</div>
+          </div>
+          <div class="map-poi-row" data-poi-idx="4">
+            <div class="poi-dot" style="background:#c8972a;"></div>
+            <div><div class="poi-name-th">宁曼路</div><div class="poi-name-en">Nimmanhaemin Road</div></div>
+            <div class="poi-density">75%</div>
+          </div>
+          <div class="map-poi-row" data-poi-idx="5">
+            <div class="poi-dot" style="background:#e03939;"></div>
+            <div><div class="poi-name-th">长康路夜市</div><div class="poi-name-en">Night Bazaar</div></div>
+            <div class="poi-density">78%</div>
+          </div>
+          <div class="map-poi-row" data-poi-idx="6">
+            <div class="poi-dot" style="background:#c8972a;"></div>
+            <div><div class="poi-name-th">塔佩门</div><div class="poi-name-en">Tha Phae Gate</div></div>
+            <div class="poi-density">72%</div>
+          </div>
+          <div class="map-poi-row" data-poi-idx="7">
+            <div class="poi-dot" style="background:#c8972a;"></div>
+            <div><div class="poi-name-th">茵他侬国家公园</div><div class="poi-name-en">Doi Inthanon</div></div>
+            <div class="poi-density">65%</div>
+          </div>
+        </div>
+
+        <!-- 提示卡片 -->
+        <div class="map-time-badge reveal reveal-delay-2">
+          <strong>💡 出行提示</strong><br>
+          高峰时段因景点而异：夜市 17:00–22:00 · 寺庙 07:00–12:00。<br>
+          点击地图标记或右侧列表，可查看详情与实景照片。
+        </div>
+      </div>
+    </div>
+
+    <!-- POI 图片预览区域（点击地图或列表后显示） -->
+    <div class="poi-preview-section" id="poi-preview-section">
+      <div class="poi-preview-eyebrow">📍 实景预览</div>
+      <div class="poi-preview-title" id="poi-preview-title"></div>
+      <div class="poi-preview-title-en" id="poi-preview-title-en"></div>
+      <div class="poi-preview-grid" id="poi-preview-grid">
+        <div class="poi-preview-img-wrap"><img id="poi-img-0" src="" alt="Photo 1" loading="lazy" onerror="this.src='https://placehold.co/400x240/2d6a4f/f5f0e8?text=Chiang+Mai'"></div>
+        <div class="poi-preview-img-wrap"><img id="poi-img-1" src="" alt="Photo 2" loading="lazy" onerror="this.src='https://placehold.co/400x240/c8972a/f5f0e8?text=Temple+View'"></div>
+        <div class="poi-preview-img-wrap"><img id="poi-img-2" src="" alt="Photo 3" loading="lazy" onerror="this.src='https://placehold.co/400x240/e07b39/f5f0e8?text=Chiang+Mai+Night'"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 情感区 ══════════════════════════════════ -->
+<section id="sentiment">
+  <div class="sent-layout">
+    <div class="sent-left reveal">
+      <p class="section-label">04 · 游客情感</p>
+      <h3>8 大 POI 总体情感倾向</h3>
+      <div class="donut-wrap">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#1a1a1a" stroke-width="18"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#40916c" stroke-width="18"
+            stroke-dasharray="148.6 238.8" stroke-dashoffset="0" transform="rotate(-90 50 50)"
+            style="transition:stroke-dasharray 1.5s ease;"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#c8972a" stroke-width="18"
+            stroke-dasharray="57.3 330.1" stroke-dashoffset="-148.6" transform="rotate(-90 50 50)"
+            style="transition:stroke-dasharray 1.5s ease 0.3s;"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#c0392b" stroke-width="18"
+            stroke-dasharray="33.4 354" stroke-dashoffset="-205.9" transform="rotate(-90 50 50)"
+            style="transition:stroke-dasharray 1.5s ease 0.6s;"/>
+        </svg>
+        <div class="donut-center">
+          <div class="donut-num">62%</div>
+          <div class="donut-lbl">正面</div>
+        </div>
+      </div>
+      <div class="legend-row"><div class="legend-dot" style="background:#40916c;"></div><span class="legend-text">正面评价</span><span class="legend-pct">62%</span></div>
+      <div class="legend-row"><div class="legend-dot" style="background:#c8972a;"></div><span class="legend-text">中性评价</span><span class="legend-pct">24%</span></div>
+      <div class="legend-row"><div class="legend-dot" style="background:#c0392b;"></div><span class="legend-text">负面评价</span><span class="legend-pct">14%</span></div>
+    </div>
+    <div class="sent-right reveal reveal-delay-2">
+      <h3>各 POI 情感细分解读</h3>
+      <div class="poi-sentiment-list" id="sentimentList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 指标区 ════════════════════════════════════ -->
+<section id="metrics">
+  <div style="width:100%;max-width:1100px;">
+    <p class="section-label" style="text-align:center;">05 · 评估结果</p>
+    <h2>检索与效率指标<em>超越目标</em></h2>
+    <p class="sub">38 查询评估集 · paraphrase-multilingual-MiniLM-L12-v2 嵌入 · Groq LLaMA 3.1 8B</p>
+    <div class="metrics-layout">
+      <div class="metric-panel reveal">
+        <h3>RAG 检索质量</h3>
+        <div class="hit-rates" id="hitRates"></div>
+        <div class="hit-target"><span class="icon" style="margin-right:.3rem;"><svg viewBox="0 0 24 24" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg></span>达成目标 · Hit Rate @5 ≥ 0.75（方案书 §4 O2）</div>
+      </div>
+      <div class="metric-panel reveal reveal-delay-2">
+        <h3>Token 经济学（RQ3）</h3>
+        <div class="token-compare">
+          <div class="token-col">
+            <div class="token-col-label">普通 RAG</div>
+            <div class="token-bubble plain">
+              <div class="tnum">430</div>
+              <div class="tlbl">tokens/查询</div>
+            </div>
+            <div class="token-detail">
+              输入: ~250 tokens<br>
+              输出: ~180 tokens<br>
+              工具调用: 0<br>
+              成本: $0.000022
+            </div>
+          </div>
+          <div class="token-col">
+            <div class="token-col-label">智能体 RAG</div>
+            <div class="token-bubble agentic">
+              <div class="tnum" style="color:var(--gold);">742</div>
+              <div class="tlbl">tokens/查询</div>
+            </div>
+            <div class="token-detail">
+              输入: ~480 tokens<br>
+              输出: ~262 tokens<br>
+              工具调用: ~3–4<br>
+              成本: $0.000037
+            </div>
+          </div>
+        </div>
+        <div class="token-win"><span class="icon" style="margin-right:.3rem;"><svg viewBox="0 0 24 24" width="14" height="14"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>智能体 RAG 多消耗 1.7 倍 token，但 Hit Rate @5 达到 78.9%</div>
+      </div>
+      <div class="metric-panel reveal reveal-delay-1" style="grid-column:1/-1;">
+        <h3>各类别 Hit Rate @5</h3>
+        <div id="catBars" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:.5rem;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 演示区 ═══════════════════════════════════════ -->
+<section id="demo">
+  <div style="width:100%;max-width:700px;display:flex;flex-direction:column;align-items:center;gap:1.5rem;">
+    <p class="section-label" style="text-align:center;">06 · 智能体 RAG 实战</p>
+    <h2 style="text-align:center;">观察 <em>ReAct 循环</em> 如何工作</h2>
+    <p class="sub">点击下方查询，查看智能体推理、调用工具并回答</p>
+    <div class="chat-queries" id="queryChips"></div>
+    <div class="chat-demo">
+      <div class="chat-topbar">
+        <div class="chat-dots">
+          <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        </div>
+        <span class="chat-title">清迈智慧旅游 AI · LLaMA 3.1 8B</span>
+      </div>
+      <div class="chat-body" id="chatBody">
+        <div class="msg bot">สวัสดีครับ！我是您的清迈旅游助手。<br>可以问我关于人流密度、游客评价或推荐景点。 <span class="icon"><svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="10" width="18" height="11"/><path d="M3 10V6h3V3h3v3h3V3h3v3h3v4"/><line x1="9" y1="21" x2="9" y2="15"/><line x1="15" y1="21" x2="15" y2="15"/></svg></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 结语区 ════════════════════════════════════ -->
+<section id="closing">
+  <div class="hero-orb orb1" style="opacity:.5;"></div>
+  <div class="hero-orb orb2" style="opacity:.5;"></div>
+  <div class="closing-inner">
+    <p class="section-label">07 · 结论</p>
+    <h2>三个研究问题。<br><em>一个智能体答案。</em></h2>
+    <div class="rq-grid">
+      <div class="rq-card reveal">
+        <div class="rq-num">研究问题 1</div>
+        <div class="rq-q">“智能体 RAG 能否准确回答过度旅游相关问题？”</div>
+        <div class="rq-a"><span class="icon" style="margin-right:.2rem;"><svg viewBox="0 0 24 24" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg></span>情感 Hit Rate @5 = 0.750 · 总体 = 0.789</div>
+      </div>
+      <div class="rq-card reveal reveal-delay-1">
+        <div class="rq-num">研究问题 2</div>
+        <div class="rq-q">“GNSS 密度是否能改善人群拥挤程度回答？”</div>
+        <div class="rq-a"><span class="icon" style="margin-right:.2rem;"><svg viewBox="0 0 24 24" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg></span>人群拥挤类别 Hit Rate @5 = 0.800 · 最高类别</div>
+      </div>
+      <div class="rq-card reveal reveal-delay-2">
+        <div class="rq-num">研究问题 3</div>
+        <div class="rq-q">“智能体 RAG 相比普通 RAG 的 token 成本是多少？”</div>
+        <div class="rq-a"><span class="icon" style="margin-right:.2rem;"><svg viewBox="0 0 24 24" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg></span>1.7 倍 token · $0.000037/查询 · 在免费额度内</div>
+      </div>
+    </div>
+    <div class="team-credits">
+      <div class="team-credit">陈文华 (Boonyoros Pheechaphuth) · LS2525207</div>
+      <div class="team-credit">李彬 (Teh Bismin) · LS2525222</div>
+    </div>
+    <p class="course-note">人工智能与大型模型 期末项目 · 智能体 RAG 赋能智慧旅游 · 泰国清迈</p>
+  </div>
+</section>
+
+<script>
+/* ──────────────────────────────────────────────
+   原有函数：POI 卡片、情感分析、指标等
+   ────────────────────────────────────────────── */
+const IC = {
+  mapPin:'<span class="icon"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>',
+  clock:'<span class="icon"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>',
+  alertCircle:'<span class="icon" style="color:#c0392b"><svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>',
+  msgSquare:'<span class="icon"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>',
+  thumbsUp:'<span class="icon" style="color:#40916c"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span>',
+  alertTri:'<span class="icon" style="color:#e07b39"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>',
+  building:'<span class="icon"><svg viewBox="0 0 24 24" width="14" height="14"><rect x="3" y="10" width="18" height="11"/><path d="M3 10V6h3V3h3v3h3V3h3v3h3v4"/><line x1="9" y1="21" x2="9" y2="15"/><line x1="15" y1="21" x2="15" y2="15"/></svg></span>',
+  check:'<span class="icon" style="color:#40916c"><svg viewBox="0 0 24 24" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg></span>',
+  gear:'<span class="tool-icon"><svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>',
+};
+
+/* POI 数据 (来自 config_pois.json) */
+const POIS = [
+  {name:"周日夜市步行街",cat:"市场 / 步行街",density:0.92,risk:"very_high",dwell:90,tracks:420,lat:18.7882,lng:98.9853,time:"17:00–22:00",sentiment:57,reviews:7},
+  {name:"素贴山双龙寺",cat:"寺庙 / 遗产",density:0.88,risk:"high",dwell:60,tracks:320,lat:18.8048,lng:98.9220,time:"07:00–10:00",sentiment:50,reviews:6},
+  {name:"帕辛寺",cat:"寺庙 / 遗产",density:0.85,risk:"high",dwell:45,tracks:280,lat:18.7878,lng:98.9836,time:"09:00–12:00",sentiment:57,reviews:7},
+  {name:"契迪龙寺",cat:"寺庙 / 遗产",density:0.80,risk:"high",dwell:40,tracks:250,lat:18.7874,lng:98.9854,time:"08:00–11:00",sentiment:75,reviews:4},
+  {name:"宁曼路",cat:"咖啡馆 & 餐饮区",density:0.75,risk:"medium",dwell:120,tracks:350,lat:18.7975,lng:98.9665,time:"18:00–22:00",sentiment:80,reviews:5},
+  {name:"长康路夜市",cat:"市场 / 购物",density:0.78,risk:"high",dwell:75,tracks:290,lat:18.7827,lng:99.0000,time:"18:00–23:00",sentiment:75,reviews:4},
+  {name:"瓦洛洛市场",cat:"本地市场",density:0.70,risk:"medium",dwell:50,tracks:200,lat:18.7921,lng:98.9960,time:"06:00–18:00",sentiment:65,reviews:4},
+  {name:"塔佩门",cat:"历史城门",density:0.72,risk:"medium",dwell:30,tracks:260,lat:18.7884,lng:98.9937,time:"09:00–20:00",sentiment:100,reviews:4},
+  {name:"清迈动物园",cat:"动物园 / 家庭",density:0.68,risk:"medium",dwell:150,tracks:210,lat:18.8036,lng:98.9518,time:"09:00–17:00",sentiment:72,reviews:3},
+  {name:"茵他侬国家公园",cat:"国家公园",density:0.65,risk:"medium",dwell:180,tracks:180,lat:18.5877,lng:98.4866,time:"07:00–16:00",sentiment:66,reviews:6},
+  {name:"尚泰清迈购物中心",cat:"购物中心",density:0.65,risk:"medium",dwell:120,tracks:195,lat:18.7993,lng:98.9697,time:"11:00–21:00",sentiment:62,reviews:3},
+  {name:"玛雅购物中心",cat:"购物中心",density:0.70,risk:"medium",dwell:90,tracks:230,lat:18.7970,lng:98.9720,time:"11:00–21:00",sentiment:68,reviews:3},
+  {name:"松德寺",cat:"寺庙 / 遗产",density:0.60,risk:"low",dwell:35,tracks:150,lat:18.7872,lng:98.9696,time:"08:00–17:00",sentiment:72,reviews:3},
+  {name:"拉查帕皇家花园",cat:"植物园",density:0.60,risk:"low",dwell:120,tracks:160,lat:18.7545,lng:98.9325,time:"08:00–18:00",sentiment:70,reviews:3},
+  {name:"悟孟寺",cat:"寺庙 / 冥想",density:0.52,risk:"low",dwell:50,tracks:140,lat:18.7797,lng:98.9567,time:"08:00–17:00",sentiment:70,reviews:4},
+  {name:"清迈夜间野生动物园",cat:"野生动物 / 夜间",density:0.55,risk:"low",dwell:120,tracks:130,lat:18.7402,lng:98.9750,time:"18:00–23:00",sentiment:68,reviews:3},
+  {name:"doi pui 苗族村",cat:"文化村",density:0.55,risk:"low",dwell:75,tracks:120,lat:18.8230,lng:98.9090,time:"08:00–17:00",sentiment:66,reviews:3},
+  {name:"清曼寺",cat:"寺庙 / 遗产",density:0.55,risk:"low",dwell:30,tracks:130,lat:18.7937,lng:98.9870,time:"08:00–17:00",sentiment:73,reviews:3},
+  {name:"班塔瓦木雕村",cat:"手工艺村",density:0.58,risk:"low",dwell:90,tracks:145,lat:18.7030,lng:98.9500,time:"08:00–17:00",sentiment:74,reviews:3},
+  {name:"安娇水库",cat:"公园 / 休闲",density:0.50,risk:"low",dwell:45,tracks:120,lat:18.7580,lng:98.9570,time:"06:00–18:00",sentiment:68,reviews:3},
+  {name:"doi kham 寺",cat:"寺庙 / 遗产",density:0.45,risk:"low",dwell:40,tracks:110,lat:18.7510,lng:98.9290,time:"08:00–17:00",sentiment:70,reviews:3},
+  {name:"湄康蓬村",cat:"生态旅游",density:0.48,risk:"low",dwell:180,tracks:90,lat:18.6700,lng:99.1000,time:"全天",sentiment:80,reviews:3},
+  {name:"山甘烹温泉",cat:"天然温泉",density:0.42,risk:"low",dwell:120,tracks:80,lat:18.7450,lng:99.1500,time:"08:00–18:00",sentiment:78,reviews:3},
+  {name:"清迈艺术文化中心",cat:"博物馆",density:0.40,risk:"low",dwell:60,tracks:85,lat:18.7885,lng:98.9860,time:"09:00–17:00",sentiment:68,reviews:3},
+];
+
+/* 情感数据 (来自 step1_youtube.py 整理) */
+const SENTIMENT_POIS = [
+  {name:"周日夜市步行街",pos:71,neu:18,neg:11},
+  {name:"素贴山双龙寺",pos:65,neu:20,neg:15},
+  {name:"帕辛寺",pos:68,neu:18,neg:14},
+  {name:"契迪龙寺",pos:60,neu:22,neg:18},
+  {name:"宁曼路",pos:74,neu:16,neg:10},
+  {name:"长康路夜市",pos:55,neu:25,neg:20},
+  {name:"塔佩门",pos:70,neu:20,neg:10},
+  {name:"茵他侬国家公园",pos:78,neu:14,neg:8},
+];
+
+/* 评估数据 */
+const HIT_RATES = [
+  {k:"@1",val:.526,label:"Hit Rate @1"},
+  {k:"@3",val:.684,label:"Hit Rate @3"},
+  {k:"@5",val:.789,label:"Hit Rate @5 ✓"},
+  {k:"MRR",val:.712,label:"MRR"},
+];
+const CAT_RATES = [
+  {cat:"人群 / GPS",rate:.800},{cat:"旅游贴士",rate:.833},
+  {cat:"季节性",rate:.800},{cat:"研究类",rate:.875},
+  {cat:"情感",rate:.750},{cat:"美食",rate:.667},
+];
+
+/* 演示场景（中文版） */
+const DEMO_SCENARIOS = {
+  "素贴山双龙寺现在拥挤吗？":[
+    {type:"user",text:"素贴山双龙寺现在拥挤吗？"},
+    {type:"tool",text:'get_hotspot("素贴山双龙寺")'},
+    {type:"bot",text:`${IC.mapPin} <strong>素贴山双龙寺</strong><br>GPS 密度: <strong>0.88 / 1.00</strong> · 拥挤等级: <strong>高密度</strong><br>平均停留: 60 分钟 · 320 条轨迹 · 高峰时段: 07:00–10:00<br><br>${IC.alertCircle} 过度旅游风险: <strong>高</strong>。建议避开高峰时段前往。`},
+  ],
+  "哪座寺庙人最少？":[
+    {type:"user",text:"哪座寺庙人最少？"},
+    {type:"tool",text:'search_poi("寺庙")'},
+    {type:"tool",text:'rag_retrieve("清迈 人少 寺庙")'},
+    {type:"bot",text:`${IC.building} 人流较少的寺庙推荐:<br><strong>1. doi kham 寺</strong> — 密度 0.45 (低) · 多为本地信徒<br><strong>2. 悟孟寺</strong> — 密度 0.52 (低) · 森林冥想寺庙<br><strong>3. 清曼寺</strong> — 密度 0.55 (低) · 最古老寺庙，建于 1296 年<br><br>${IC.check} 这三处大部分时间游览都很舒适。`},
+  ],
+  "长康路夜市的游客评价如何？":[
+    {type:"user",text:"长康路夜市的游客评价如何？"},
+    {type:"tool",text:'get_sentiment("长康路夜市")'},
+    {type:"tool",text:'get_hotspot("长康路夜市")'},
+    {type:"bot",text:`${IC.msgSquare} <strong>长康路夜市 情感报告</strong><br>分析 290 条轨迹数据 · 55% 正面 / 25% 中性 / 20% 负面<br><br>${IC.thumbsUp} 主要好评: <em>'尽管商业化，夜市依然保留魅力'</em><br>${IC.alertTri} 主要抱怨: <em>'主入口附近有招揽拉客行为'</em><br><br>GPS 密度: 0.78 · 高风险 · 最佳游览时间 21:30 之后。`},
+  ],
+};
+
+/* 渲染 POI 卡片 */
+function renderPOIs(filter='all'){
+  const grid = document.getElementById('poiGrid');
+  grid.innerHTML = '';
+  const filtered = filter==='all' ? POIS : POIS.filter(p=>p.risk===filter);
+  filtered.forEach((poi,i)=>{
+    const pct = Math.round(poi.density*100);
+    const riskLabel = poi.risk === 'very_high' ? '极高风险' : (poi.risk === 'high' ? '高风险' : (poi.risk === 'medium' ? '中风险' : '低风险'));
+    const card = document.createElement('div');
+    card.className = `poi-card ${poi.risk}`;
+    card.style.animationDelay = `${i*.05}s`;
+    card.innerHTML = `
+      <div class="poi-card-top">
+        <div class="poi-name">${poi.name}</div>
+        <div class="risk-badge ${poi.risk}">${riskLabel}</div>
+      </div>
+      <div class="poi-category">${poi.cat}</div>
+      <div class="density-bar-wrap">
+        <div class="density-label">
+          <span>GPS 密度</span>
+          <span>${poi.density.toFixed(2)}</span>
+        </div>
+        <div class="density-bar">
+          <div class="density-fill" style="width:0%" data-width="${pct}%"></div>
+        </div>
+      </div>
+      <div class="poi-meta">
+        <span>${IC.clock} ${poi.dwell} 分钟</span>
+        <span>${IC.mapPin} ${poi.tracks} 条轨迹</span>
+      </div>`;
+    grid.appendChild(card);
+    setTimeout(()=>{
+      const fill = card.querySelector('.density-fill');
+      if(fill) fill.style.width = fill.dataset.width;
+    }, 100 + i*40);
+  });
+}
+
+function filterPOIs(risk,btn){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPOIs(risk);
+}
+
+function renderSentiment(){
+  const list = document.getElementById('sentimentList');
+  SENTIMENT_POIS.forEach(poi=>{
+    const el = document.createElement('div');
+    el.className = 'poi-sent-item';
+    el.innerHTML = `
+      <div class="poi-sent-name">${poi.name}</div>
+      <div class="mini-bars">
+        <div class="mini-bar-pos" style="flex:${poi.pos}"></div>
+        <div class="mini-bar-neu" style="flex:${poi.neu}"></div>
+        <div class="mini-bar-neg" style="flex:${poi.neg}"></div>
+      </div>
+      <div class="mini-pcts">
+        <span class="pct-pos">+${poi.pos}%</span>
+        <span class="pct-neu">~${poi.neu}%</span>
+        <span class="pct-neg">-${poi.neg}%</span>
+      </div>`;
+    list.appendChild(el);
+  });
+}
+
+function renderHitRates(){
+  const wrap = document.getElementById('hitRates');
+  HIT_RATES.forEach(hr=>{
+    const pct = Math.round(hr.val*100);
+    wrap.innerHTML += `
+      <div class="hit-row">
+        <div class="hit-k">${hr.k}</div>
+        <div class="hit-bar-wrap">
+          <div class="hit-bar" style="width:0%" data-width="${pct}%"></div>
+        </div>
+        <div class="hit-val">${hr.val.toFixed(3)}</div>
+      </div>`;
+  });
+  setTimeout(()=>{
+    document.querySelectorAll('.hit-bar').forEach(b=>{ b.style.width = b.dataset.width; });
+  },500);
+}
+
+function renderCatBars(){
+  const wrap = document.getElementById('catBars');
+  CAT_RATES.forEach(c=>{
+    const pct = Math.round(c.rate*100);
+    const col = c.rate>=.80?'var(--jade2)':c.rate>=.75?'var(--gold)':'var(--saffron)';
+    wrap.innerHTML += `
+      <div>
+        <div style="font-size:.65rem;color:#666;margin-bottom:.4rem;letter-spacing:.08em;">${c.cat}</div>
+        <div style="height:8px;background:#eee;border-radius:4px;overflow:hidden;margin-bottom:.3rem;">
+          <div style="height:100%;width:${pct}%;background:${col};border-radius:4px;transition:width 1.2s ease;"></div>
+        </div>
+        <div style="font-size:.7rem;font-weight:700;color:${col};">${c.rate.toFixed(3)}</div>
+      </div>`;
+  });
+}
+
+/* 聊天演示 */
+const QUERY_LABELS = Object.keys(DEMO_SCENARIOS);
+let chatRunning = false;
+
+function renderQueryChips(){
+  const wrap = document.getElementById('queryChips');
+  QUERY_LABELS.forEach(q=>{
+    const btn = document.createElement('button');
+    btn.className = 'query-chip';
+    btn.textContent = q;
+    btn.onclick = ()=>runDemo(q,btn);
+    wrap.appendChild(btn);
+  });
+}
+
+async function runDemo(query,btn){
+  if(chatRunning) return;
+  chatRunning = true;
+  document.querySelectorAll('.query-chip').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const body = document.getElementById('chatBody');
+  body.innerHTML = `<div class="msg bot">สวัสดีครับ！我是您的清迈旅游助手。<br>可以问我关于人流密度、游客评价或推荐景点。${IC.building}</div>`;
+
+  const steps = DEMO_SCENARIOS[query];
+  for(const step of steps){
+    await delay(700);
+    if(step.type==='user'){
+      body.innerHTML += `<div class="msg user">${step.text}</div>`;
+    } else if(step.type==='tool'){
+      const t = document.createElement('div');
+      t.className='typing';
+      t.innerHTML='<span></span><span></span><span></span>';
+      body.appendChild(t);
+      body.scrollTop = body.scrollHeight;
+      await delay(800);
+      t.remove();
+      body.innerHTML += `<div class="tool-call">${IC.gear}${step.text}</div>`;
+    } else {
+      const t = document.createElement('div');
+      t.className='typing';
+      t.innerHTML='<span></span><span></span><span></span>';
+      body.appendChild(t);
+      body.scrollTop = body.scrollHeight;
+      await delay(1200);
+      t.remove();
+      body.innerHTML += `<div class="msg bot">${step.text}</div>`;
+    }
+    body.scrollTop = body.scrollHeight;
+  }
+  chatRunning = false;
+}
+
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function highlightPipe(el){
+  document.querySelectorAll('.pipe-step').forEach(s=>s.classList.remove('active-step'));
+  el.classList.add('active-step');
+}
+
+/* ── 光标与交互 ── */
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX; my=e.clientY;
+  cursor.style.left=mx-6+'px'; cursor.style.top=my-6+'px';
+});
+function animRing(){
+  rx += (mx-rx-20)*.12; ry += (my-ry-20)*.12;
+  ring.style.left=rx+'px'; ring.style.top=ry+'px';
+  requestAnimationFrame(animRing);
+}
+animRing();
+document.querySelectorAll('a,button,.poi-card,.filter-btn,.pipe-step,.rq-card,.stat-card,.map-poi-row').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{cursor.style.transform='scale(2.5)'; ring.style.transform='scale(1.5)';});
+  el.addEventListener('mouseleave',()=>{cursor.style.transform='scale(1)'; ring.style.transform='scale(1)';});
+});
+
+/* 滚动显示与导航点 */
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+const sections = ['hero','problem','pipeline','density','map-section','sentiment','metrics','demo','closing'];
+const dots = document.querySelectorAll('.nav-dot');
+dots.forEach((dot,i)=>{
+  dot.addEventListener('click',()=>{
+    document.getElementById(sections[i]).scrollIntoView({behavior:'smooth'});
+  });
+});
+const secObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const idx = sections.indexOf(e.target.id);
+      dots.forEach(d=>d.classList.remove('active'));
+      if(idx>=0) dots[idx].classList.add('active');
+      if(e.target.id==='metrics'){
+        setTimeout(()=>{
+          document.querySelectorAll('.hit-bar').forEach(b=>{ b.style.width=b.dataset.width; });
+        },300);
+      }
+    }
+  });
+},{threshold:.4});
+sections.forEach(id=>{ const el=document.getElementById(id); if(el) secObs.observe(el); });
+
+// ภาพสำหรับ POI Preview (ใช้ Unsplash image API ที่ใช้งานได้จริง)
+const POI_IMAGES = {
+  "周日夜市步行街": [
+    "https://image-tc.galaxy.tf/wijpeg-1563bag21idvzcvn77jl1irr0/sunday-walking-street-market-chiang-mai-thailand-2013-01-13-18-57-17_standard.jpg?crop=70%2C0%2C1060%2C795",
+    "https://apis.airportthai.co.th/microsite/images/post/ckeditor/2021-12-15-16-06-404-shutterstock_316883423.jpg",
+    "https://aramblingunicorn.com/wp-content/uploads/2022/12/Chiang-Mai-Sunday-Market-25.jpg"
+  ],
+  "素贴山双龙寺": [
+    "https://www.tripsavvy.com/thmb/kN98fxIp48KGDa_kqSiCw8CWpoU=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/DoiSuthepPano1-1-5c1406eb46e0fb000168c8ba.jpg",
+    "https://i1.wp.com/letravels.com/wp-content/uploads/2018/11/img_6243-1.jpg?fit=1920%2C1280&ssl=1",
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4fi3PgfWuWnkiLyR8ycxh_LqSTZpJQsZpZw&s"
+  ],
+  "帕辛寺": [
+    "https://cdn1.citylife.group/tat2/wp-content/uploads/2022/05/%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%9E%E0%B8%A3%E0%B8%B0%E0%B8%AA%E0%B8%B4%E0%B8%87%E0%B8%AB%E0%B9%8C2-Wat-Pra-SIng2.jpg",
+    "https://www.placesofjuma.com/wp-content/uploads/2019/10/Chiang-Mai-17-scaled.jpg",
+    "https://mychiangmaitour.com/wp-content/uploads/2018/02/wat_phra_singh_chiang_rai01.jpg"
+  ],
+  "契迪龙寺": [
+    "https://images.squarespace-cdn.com/content/v1/5438e2c6e4b0b18459a8ca06/1593080023687-2WNKQ64LB63VEV4UMVZ4/GTJ-2020-0625-39.jpg",
+    "https://images.squarespace-cdn.com/content/v1/5438e2c6e4b0b18459a8ca06/1593080275991-VH2IOY4XV4ZHMERVAQL0/GTJ-2020-0625-84.jpg",
+    "https://www.asiakingtravel.com/cuploads/files/wat-chedi-luang-3.jpg"
+  ],
+  "宁曼路": [
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT_uoVw_dkFteD5rDaAPbCre3jyFWLVNVOOUA&s",
+    "https://www.mychiangmaitravel.com/wp-content/uploads/2017/07/nimmanhaemin-road01.jpg",
+    "https://goop-img.com/wp-content/uploads/2018/11/Nimmanhaemin-Road.jpg"
+  ],
+  "长康路夜市": [
+    "https://api.tourismthailand.org/upload/live/business_content_thumbnail/12595/P06002139.jpeg",
+    "https://travelersanddreamers.com/wp-content/uploads/2023/05/chiang-mai-night-market-2-1024x678.jpg",
+    "https://images.trvl-media.com/place/6216344/705d1da8-c0bf-4e92-9778-6633b906d864.jpg"
+  ],
+  "塔佩门": [
+    "https://www.thainationalparks.com/img/package/2020/08/31/397017/two-chedis-w-900.jpg",
+    "https://www.pelago.com/img/products/TH-Thailand/doi-inthanon-national-park-village-tour/0404-0622_bharath-mohan-2cjonwjcmjm-unsplash.jpg",
+    "https://www.thainationalparks.com/img/poi/2019/12/10/394794/doi-inthanon-chiang-mai-thailand-sea-of-mist-w-900.jpg"
+  ],
+  "茵他侬国家公园": [
+    "https://www.thainationalparks.com/img/package/2020/08/31/397017/two-chedis-w-900.jpg",
+    "https://www.pelago.com/img/products/TH-Thailand/doi-inthanon-national-park-village-tour/0404-0622_bharath-mohan-2cjonwjcmjm-unsplash.jpg",
+    "https://www.thainationalparks.com/img/poi/2019/12/10/394794/doi-inthanon-chiang-mai-thailand-sea-of-mist-w-900.jpg"
+  ]
+};
+
+// Default images for POI without specific set
+const DEFAULT_IMAGES = [
+  "https://itinari-images.s3.eu-west-1.amazonaws.com/activity/images/original/4e65281a-0d2f-4b3f-876b-1350621205fd-efesenko.jpg",
+  "https://storage.googleapis.com/tagthai-prd-content/Tha_Phae_Chiang_Mai_Activities_29fc240904/Tha_Phae_Chiang_Mai_Activities_29fc240904.jpg",
+  "https://thethaiger.com/wp-content/uploads/2024/08/Tha-Phae-Gate-1.jpg"
+];
+
+function showPOIPreview(poiIdx) {
+  const poi = POIS[poiIdx];
+  if (!poi) return;
+  
+  const section = document.getElementById('poi-preview-section');
+  const titleEl = document.getElementById('poi-preview-title');
+  const titleEnEl = document.getElementById('poi-preview-title-en');
+  const img0 = document.getElementById('poi-img-0');
+  const img1 = document.getElementById('poi-img-1');
+  const img2 = document.getElementById('poi-img-2');
+  
+  titleEl.textContent = poi.name;
+  titleEnEl.textContent = poi.cat;
+  
+  // Get images for this POI or use defaults
+  const images = POI_IMAGES[poi.name] || DEFAULT_IMAGES;
+  
+  img0.src = images[0] || DEFAULT_IMAGES[0];
+  img1.src = images[1] || DEFAULT_IMAGES[1];
+  img2.src = images[2] || DEFAULT_IMAGES[2];
+  
+  section.classList.remove('active');
+  void section.offsetWidth;
+  section.classList.add('active');
+}
+
+/* ── LEAFLET MAP 初始化 ── */
+let map;
+let markersList = [];
+
+function initInteractiveMap() {
+  map = L.map('poi-map').setView([18.7883, 98.9853], 13);
+  
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> & CartoDB',
+    subdomains: 'abcd',
+    maxZoom: 19,
+    minZoom: 10
+  }).addTo(map);
+  
+  function getColorByDensity(density) {
+    if (density >= 0.8) return '#e03939';
+    if (density >= 0.6) return '#c8972a';
+    return '#2d6a4f';
+  }
+  
+  POIS.forEach((poi, idx) => {
+    const color = getColorByDensity(poi.density);
+    const radius = 8 + Math.floor(poi.density * 8);
+    
+    const circleMarker = L.circleMarker([poi.lat, poi.lng], {
+      radius: radius,
+      fillColor: color,
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.85
+    });
+    
+    const popupContent = `
+      <div class="poi-popup">
+        <div class="poi-popup-name">${poi.name}</div>
+        <div class="poi-popup-en">${poi.cat}</div>
+        <div class="poi-popup-grid">
+          <div class="poi-popup-stat">
+            <div class="poi-popup-val" style="color:${color}">${Math.round(poi.density*100)}%</div>
+            <div class="poi-popup-lbl">GPS 密度</div>
+          </div>
+          <div class="poi-popup-stat">
+            <div class="poi-popup-val">${poi.dwell} 分钟</div>
+            <div class="poi-popup-lbl">平均停留</div>
+          </div>
+          <div class="poi-popup-stat">
+            <div class="poi-popup-val">${poi.sentiment || '—'}%</div>
+            <div class="poi-popup-lbl">正面评价</div>
+          </div>
+          <div class="poi-popup-stat">
+            <div class="poi-popup-val">${poi.time || '—'}</div>
+            <div class="poi-popup-lbl">高峰时段</div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    circleMarker.bindPopup(popupContent);
+    circleMarker.addTo(map);
+    markersList.push({ marker: circleMarker, idx: idx, data: poi });
+    
+    circleMarker.on('click', () => {
+      showPOIPreview(idx);
+    });
+    
+    if (poi.density >= 0.8) {
+      L.circleMarker([poi.lat, poi.lng], {
+        radius: radius + 5,
+        fillColor: 'transparent',
+        color: color,
+        weight: 1.5,
+        opacity: 0.4,
+        fillOpacity: 0,
+        interactive: false
+      }).addTo(map);
+    }
+  });
+  
+  const poiRows = document.querySelectorAll('.map-poi-row');
+  poiRows.forEach((row, idx) => {
+    row.addEventListener('click', () => {
+      const poiIdx = parseInt(row.getAttribute('data-poi-idx'), 10);
+      if (!isNaN(poiIdx) && markersList[poiIdx]) {
+        const targetMarker = markersList[poiIdx];
+        map.flyTo([targetMarker.data.lat, targetMarker.data.lng], 15, { duration: 1.2 });
+        setTimeout(() => targetMarker.marker.openPopup(), 1300);
+        poiRows.forEach(r => r.style.background = '');
+        row.style.background = 'rgba(200,151,42,.15)';
+        showPOIPreview(poiIdx);
+      }
+    });
+  });
+}
+
+/* 初始化所有内容 */
+renderPOIs();
+renderSentiment();
+renderHitRates();
+renderCatBars();
+renderQueryChips();
+
+if (typeof L !== 'undefined') {
+  setTimeout(initInteractiveMap, 300);
+} else {
+  window.addEventListener('load', () => setTimeout(initInteractiveMap, 500));
+}
+</script>
+</body>
+</html>
